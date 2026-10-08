@@ -242,6 +242,8 @@ if __name__ == "__main__":
 
     start_vllm()
     wait_for_vllm()
-
     print("Starting Runpod Serverless handler...")
-    runpod.serverless.start({"handler": handler})
+
+
+# Must stay at the start of the line. Runpod's repo scan looks for this call.
+runpod.serverless.start({"handler": handler})
