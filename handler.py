@@ -21,6 +21,15 @@ GPU_MEMORY_UTILIZATION = os.getenv("GPU_MEMORY_UTILIZATION", "0.85")
 MAX_NUM_SEQS = os.getenv("MAX_NUM_SEQS", "1")
 VIDEO_NUM_FRAMES = int(os.getenv("VIDEO_NUM_FRAMES", "16"))
 READY_TIMEOUT_SECONDS = int(os.getenv("VLLM_READY_TIMEOUT", "900"))
+SYSTEM_PROMPT = os.getenv(
+    "SYSTEM_PROMPT",
+    "You are a helpful assistant. Always answer in English.",
+)
+ENABLE_THINKING = os.getenv("ENABLE_THINKING", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # GLM-4.6V-Flash profiles one sample of each modality at startup.
 # Cap that sample so it fits inside MAX_MODEL_LEN.
@@ -165,6 +174,21 @@ def wait_for_vllm():
     )
 
 
+def prepare_messages(messages):
+    """Require English unless the caller already sent a system message."""
+    if not SYSTEM_PROMPT or not isinstance(messages, list):
+        return messages
+
+    has_system = any(
+        isinstance(message, dict) and message.get("role") == "system"
+        for message in messages
+    )
+    if has_system:
+        return messages
+
+    return [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+
+
 def handler(job):
     try:
         job_input = job.get("input", job)
@@ -189,9 +213,15 @@ def handler(job):
                 )
             }
 
+        template_kwargs = {"enable_thinking": ENABLE_THINKING}
+        user_template_kwargs = job_input.get("chat_template_kwargs")
+        if isinstance(user_template_kwargs, dict):
+            template_kwargs.update(user_template_kwargs)
+
         payload = {
             "model": MODEL_PATH,
-            "messages": messages,
+            "messages": prepare_messages(messages),
+            "chat_template_kwargs": template_kwargs,
         }
 
         optional_parameters = [
