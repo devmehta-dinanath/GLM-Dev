@@ -1,9 +1,9 @@
 FROM vllm/vllm-openai:v0.29.0-cu129
 
-# The assigned RunPod driver is older than CUDA 12.9. Skip the NVIDIA
-# prestart check, then load the CUDA compatibility libraries in the image.
+# Skip the NVIDIA prestart CUDA version check. Do not enable
+# VLLM_ENABLE_CUDA_COMPATIBILITY: this GPU rejects those libraries
+# with CUDA error 804.
 ENV NVIDIA_DISABLE_REQUIRE=true
-ENV VLLM_ENABLE_CUDA_COMPATIBILITY=1
 
 WORKDIR /workspace
 

@@ -82,6 +82,14 @@ def start_vllm():
     if vllm_process is not None:
         return
 
+    # Compat libraries fail on this GPU with CUDA error 804.
+    os.environ.pop("VLLM_ENABLE_CUDA_COMPATIBILITY", None)
+    ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+    if ld_path:
+        os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(
+            part for part in ld_path.split(os.pathsep) if part and "/compat" not in part
+        )
+
     prepare_compile_cache()
 
     command = [
