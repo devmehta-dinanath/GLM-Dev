@@ -5,7 +5,7 @@ FROM vllm/vllm-openai:v0.29.0-cu129
 # with CUDA error 804.
 ENV NVIDIA_DISABLE_REQUIRE=true
 ENV VLLM_ENABLE_CUDA_COMPATIBILITY=0
-
+#
 # cuda-compat's libcuda shadows the host driver and raises CUDA error 804
 # on this GPU. Drop it and search the host driver path first.
 RUN rm -f /etc/ld.so.conf.d/*compat* \
