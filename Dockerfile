@@ -13,4 +13,7 @@ COPY handler.py /workspace/handler.py
 
 EXPOSE 8000
 
+# The base image entrypoint is the vllm CLI. Clear it so this command
+# is Python, not `vllm -u /workspace/handler.py`.
+ENTRYPOINT []
 CMD ["python3", "-u", "/workspace/handler.py"]
