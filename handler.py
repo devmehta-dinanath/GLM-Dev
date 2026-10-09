@@ -189,6 +189,69 @@ def prepare_messages(messages):
     return [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
 
 
+def append_nothink(messages):
+    """GLM-4.6V thinks in Chinese unless the last user turn ends with /nothink."""
+    if not isinstance(messages, list):
+        return messages
+
+    updated = []
+    last_user_index = None
+    for index, message in enumerate(messages):
+        if isinstance(message, dict):
+            message = dict(message)
+            if message.get("role") == "user":
+                last_user_index = index
+        updated.append(message)
+
+    if last_user_index is None:
+        return updated
+
+    message = updated[last_user_index]
+    content = message.get("content")
+    if isinstance(content, str):
+        if not content.rstrip().endswith("/nothink"):
+            message["content"] = content.rstrip() + " /nothink"
+    elif isinstance(content, list):
+        parts = list(content)
+        if not parts or not (
+            isinstance(parts[-1], dict)
+            and parts[-1].get("type") == "text"
+            and str(parts[-1].get("text", "")).rstrip().endswith("/nothink")
+        ):
+            parts.append({"type": "text", "text": "/nothink"})
+        message["content"] = parts
+
+    return updated
+
+
+def visible_answer(content):
+    """Drop the Chinese <think> trace and keep the reply after it."""
+    if not isinstance(content, str):
+        return content
+
+    end = content.lower().rfind("</think>")
+    if end == -1:
+        return content
+
+    return content[end + len("</think>") :].strip()
+
+
+def english_only(result):
+    if not isinstance(result, dict):
+        return result
+
+    for choice in result.get("choices") or []:
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message")
+        if not isinstance(message, dict):
+            continue
+        message["content"] = visible_answer(message.get("content"))
+        message["reasoning_content"] = None
+
+    return result
+
+
 def handler(job):
     try:
         job_input = job.get("input", job)
@@ -218,9 +281,13 @@ def handler(job):
         if isinstance(user_template_kwargs, dict):
             template_kwargs.update(user_template_kwargs)
 
+        prepared = prepare_messages(messages)
+        if not template_kwargs.get("enable_thinking"):
+            prepared = append_nothink(prepared)
+
         payload = {
             "model": MODEL_PATH,
-            "messages": prepare_messages(messages),
+            "messages": prepared,
             "chat_template_kwargs": template_kwargs,
         }
 
@@ -258,7 +325,7 @@ def handler(job):
             }
 
         print("vLLM request completed.")
-        return response.json()
+        return english_only(response.json())
 
     except Exception as e:
         print(f"Handler error: {type(e).__name__}: {e}")
